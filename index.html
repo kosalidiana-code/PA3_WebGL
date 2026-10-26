@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>PA3 AR Desk Preview — 241629</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101418; }
+    canvas { display: block; width: 100%; height: 100%; }
+    header { position: fixed; z-index: 2; top: max(10px, env(safe-area-inset-top)); left: 10px; right: 10px; color: white; pointer-events: none; }
+    h1 { margin: 0; font-size: clamp(16px, 4vw, 22px); text-shadow: 0 1px 4px #000; }
+    #fallback { display: none; margin: 8px 0 0; padding: 9px 11px; border-radius: 8px; background: #5c1e1e; color: white; }
+    #overlay { position: fixed; z-index: 3; left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: min(360px, calc(100vw - 20px)); padding: 12px; border: 1px solid #ffffff55; border-radius: 12px; background: #101820e8; color: white; box-shadow: 0 4px 18px #0007; }
+    #status { font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-line; }
+    #tracking { display: none; margin-top: 8px; padding: 8px; border-radius: 7px; background: #8a4a00; font-weight: 700; }
+    .buttons { display: flex; gap: 8px; margin-top: 10px; }
+    button { min-height: 42px; padding: 8px 14px; border: 0; border-radius: 8px; color: white; background: #1769aa; font: inherit; font-weight: 700; touch-action: manipulation; }
+    button:disabled { opacity: .55; }
+    #clear { background: #555d66; }
+    #hint { margin: 8px 0 0; color: #d0d7de; font-size: 12px; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header>
+    <h1>AR Product Preview — Student ID 241629 — Standing Desk</h1>
+    <p id="fallback" role="status"></p>
+  </header>
+
+  <section id="overlay" aria-label="AR controls and status">
+    <div id="status">Checking immersive AR support…</div>
+    <div id="tracking" role="status">Tracking lost — move the phone slowly</div>
+    <div class="buttons">
+      <button id="start" type="button" disabled>Checking AR…</button>
+      <button id="clear" type="button">Clear</button>
+    </div>
+    <p id="hint">Aim at a flat surface. Green reticle: tap to place. Red reticle: placement is blocked.</p>
+  </section>
+
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
