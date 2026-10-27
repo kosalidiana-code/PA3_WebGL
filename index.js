@@ -24,7 +24,15 @@ let overlayElement;
 
 let xrSession = null;
 let localSpace = null;
+let viewerSpace = null;
 let hitTestSource = null;
+
+// One-time diagnostics for the E1/E3 measurements.
+let e1StartPosition = null;
+let e1StartLogged = false;
+let e1WalkLogged = false;
+let e1HitLogged = false;
+let e3PlacementLogged = false;
 
 let placeRequested = false;
 let anchorsEnabled = false;
@@ -243,6 +251,12 @@ async function onStartStopClick() {
 
 async function onSessionStarted(session) {
   xrSession = session;
+  viewerSpace = null;
+  e1StartPosition = null;
+  e1StartLogged = false;
+  e1WalkLogged = false;
+  e1HitLogged = false;
+  e3PlacementLogged = false;
 
   // Reset hit-test state for a new session.
   hitTestSource = null;
@@ -275,7 +289,7 @@ async function onSessionStarted(session) {
     anchorsEnabled = enabledFeatures.has("anchors");
 
     // Request one viewer-space hit-test source per session.
-    const viewerSpace =
+    viewerSpace =
       await session.requestReferenceSpace("viewer");
 
     if (xrSession !== session) return;
@@ -352,6 +366,9 @@ function render(_time, frame) {
 
 function updateTracking(frame) {
   const viewerPose = frame.getViewerPose(localSpace);
+  if (viewerPose && viewerPose.emulatedPosition !== true) {
+    logE1CameraPosition(viewerPose);
+  }
 
   trackingLost =
     !viewerPose ||
@@ -362,6 +379,28 @@ function updateTracking(frame) {
 
   if (trackingLost) {
     resetCurrentHit();
+  }
+}
+
+function logE1CameraPosition(viewerPose) {
+  const p = viewerPose.transform.position;
+  const position = new THREE.Vector3(p.x, p.y, p.z);
+  const rounded = [p.x, p.y, p.z].map((value) => Number(value.toFixed(4)));
+
+  if (!e1StartLogged) {
+    e1StartPosition = position.clone();
+    e1StartLogged = true;
+    console.log("E1 camera position in local space at session start (m):", rounded);
+    return;
+  }
+
+  if (!e1WalkLogged && e1StartPosition) {
+    const distance = position.distanceTo(e1StartPosition);
+    if (distance >= 0.95) {
+      console.log("E1 camera position after walking about 1 m (local space, m):", rounded);
+      console.log("E1 measured displacement from start (m):", Number(distance.toFixed(3)));
+      e1WalkLogged = true;
+    }
   }
 }
 
@@ -398,6 +437,17 @@ function updateReticle(frame) {
 
   currentHitPose = pose;
   currentHitResult = hit;
+
+  if (!e1HitLogged && viewerSpace) {
+    const hitInViewer = hit.getPose(viewerSpace);
+    if (hitInViewer) {
+      console.log("E1 hit.getPose(viewerSpace) matrix (column-major):", Array.from(hitInViewer.transform.matrix).map((v) => Number(v.toFixed(5))));
+      console.log("E1 hit.getPose(localSpace) matrix (column-major):", Array.from(pose.transform.matrix).map((v) => Number(v.toFixed(5))));
+      console.log("E1 viewer-space hit position (m):", [hitInViewer.transform.position.x, hitInViewer.transform.position.y, hitInViewer.transform.position.z].map((v) => Number(v.toFixed(5))));
+      console.log("E1 local-space hit position (m):", [pose.transform.position.x, pose.transform.position.y, pose.transform.position.z].map((v) => Number(v.toFixed(5))));
+      e1HitLogged = true;
+    }
+  }
 
   // The y-axis column of the pose matrix is the surface normal.
   const matrix = pose.transform.matrix;
@@ -521,6 +571,17 @@ function buildProduct() {
 }
 
 function placeProduct(hit, hitPose) {
+  if (!e3PlacementLogged) {
+    const values = Array.from(hitPose.transform.matrix);
+    const normal = [values[4], values[5], values[6]];
+    console.log("E3 hit pose matrix (16 column-major values):", values.map((v) => Number(v.toFixed(5))));
+    console.log("E3 position = matrix values [12, 13, 14] (m):", values.slice(12, 15).map((v) => Number(v.toFixed(5))));
+    console.log("E3 surface normal = y-axis column [4, 5, 6]:", normal.map((v) => Number(v.toFixed(5))));
+    console.log("E3 tilt from world up (degrees):", Number(currentSurfaceAngle.toFixed(2)));
+    console.log("E3 hand-check: acos(clamp(normal dot [0,1,0], -1, 1)) × 180/π; normal dot up =", Number(normal[1].toFixed(5)));
+    e3PlacementLogged = true;
+  }
+
   // Multi mode: a sixth placement removes the oldest product.
   if (
     PLACEMENT_MODE === "multi" &&
@@ -690,6 +751,7 @@ function onSessionEnd(endedSession) {
   }
 
   hitTestSource = null;
+  viewerSpace = null;
 
   for (const record of [...placedProducts]) {
     removeProduct(record);
